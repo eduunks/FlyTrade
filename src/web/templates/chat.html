@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat de Negociação</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0">Chat de Negociação</h5>
+                <small class="text-muted">Sessão #{{SESSION_ID}}</small>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Seu Telegram ID</label>
+                    <input id="senderId" type="number" class="form-control" placeholder="Digite seu Telegram ID" />
+                </div>
+                <div id="sessionInfo" class="mb-3"></div>
+                <div id="messageList" class="border rounded p-3 mb-3" style="height: 360px; overflow-y: auto; background: #fff;"></div>
+                <div class="input-group">
+                    <input id="messageInput" type="text" class="form-control" placeholder="Digite sua mensagem..." />
+                    <button id="sendButton" class="btn btn-primary">Enviar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const sessionId = {{SESSION_ID}};
+        const messageList = document.getElementById('messageList');
+        const sessionInfo = document.getElementById('sessionInfo');
+        const senderIdInput = document.getElementById('senderId');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+
+        async function loadSession() {
+            const res = await fetch(`/api/trade_sessions/${sessionId}`);
+            if (!res.ok) {
+                sessionInfo.innerHTML = '<div class="alert alert-danger">Sessão não encontrada.</div>';
+                return;
+            }
+            const data = await res.json();
+            sessionInfo.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div><strong>Ordem #${data.order_id}</strong> — Status: <span class="badge bg-secondary">${data.status}</span></div>
+                    <div><small>Buyer: ${data.buyer_id} | Seller: ${data.seller_id}</small></div>
+                </div>
+            `;
+        }
+
+        async function loadMessages() {
+            const res = await fetch(`/api/trade_sessions/${sessionId}/messages`);
+            if (!res.ok) return;
+            const messages = await res.json();
+            messageList.innerHTML = messages.map(m => `
+                <div class="mb-3">
+                    <div class="fw-bold">${m.sender_name}</div>
+                    <div>${m.content}</div>
+                    <div class="text-muted small">${new Date(m.created_at).toLocaleString('pt-BR')}</div>
+                </div>
+            `).join('');
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const senderId = Number(senderIdInput.value.trim());
+            const content = messageInput.value.trim();
+            if (!senderId || !content) return;
+            sendButton.disabled = true;
+            await fetch(`/api/trade_sessions/${sessionId}/messages`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sender_telegram_id: senderId, content })
+            });
+            messageInput.value = '';
+            await loadMessages();
+            sendButton.disabled = false;
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+
+        setInterval(loadMessages, 4000);
+        loadSession();
+        loadMessages();
+    </script>
+</body>
+</html>

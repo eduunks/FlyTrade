@@ -1,0 +1,6 @@
+python-telegram-bot --pre
+python-dotenv
+sqlalchemy
+fastapi
+uvicorn[standard]
+python-multipart
